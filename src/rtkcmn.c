@@ -135,6 +135,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <errno.h>
 #endif
 #include "rtklib.h"
 
@@ -3214,19 +3215,29 @@ extern int expath(const char *path, char *paths[], int nmax)
 *-----------------------------------------------------------------------------*/
 extern void createdir(const char *path)
 {
-    char buff[1024],*p;
+    char buff[1024];
+    char *ptr;
     
     tracet(3,"createdir: path=%s\n",path);
     
     strcpy(buff,path);
-    if (!(p=strrchr(buff,FILEPATHSEP))) return;
-    *p='\0';
-    
+
+    for (ptr = strchr(buff + 1, '/'); ptr; ptr = strchr(ptr + 1, '/')) {
+      *ptr = '\0';
 #ifdef WIN32
-    CreateDirectory(buff,NULL);
+      if (Createdirectory(buff, NULL) == 0) {
+	if (GetLastError() != ERROR_ALREADY_EXISTS) {
 #else
-    mkdir(buff,0777);
+      if (mkdir(buff, 0755) == -1) {
+        if (errno != EEXIST) {
 #endif
+                *ptr = '/';
+                return -1;
+            }
+        }
+        *ptr = '/';
+    }
+    
 }
 /* replace string ------------------------------------------------------------*/
 static int repstr(char *str, const char *pat, const char *rep)
